@@ -1,6 +1,7 @@
 import { PointCloud } from '../utils/load';
 import pointcloud_wgsl from '../shaders/point_cloud.wgsl';
 import { Renderer } from './renderer';
+import { GpuTimer } from '../utils/gpu-timer';
 
 export default function get_renderer(
   pc: PointCloud,
@@ -39,9 +40,12 @@ export default function get_renderer(
     ],
   });
 
+  const timer = new GpuTimer(device, ['render']);
+
   const render = (encoder: GPUCommandEncoder, texture_view: GPUTextureView) => {
     const pass = encoder.beginRenderPass({
       label: 'point cloud render',
+      timestampWrites: timer.writes(0, 1),
       colorAttachments: [
         {
           view: texture_view,
@@ -61,8 +65,11 @@ export default function get_renderer(
   return {
     frame: (encoder: GPUCommandEncoder, texture_view: GPUTextureView) => {
       render(encoder, texture_view);
+      timer.resolve(encoder);
     },
 
     camera_buffer,
+    timer,
+    destroy: () => timer.destroy(),  // the gaussian data buffers belong to the scene, not this renderer
   };
 }
